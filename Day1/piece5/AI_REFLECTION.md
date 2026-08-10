@@ -1,0 +1,7 @@
+# AI Tools Reflection
+
+Claude excelled at the macro-level architectural shift. When asked to refactor the inline validation into a Strategy pattern, it correctly extracted an IOrderValidationStrategy interface and injected IEnumerable<IOrderValidationStrategy> into the OrderService so that the validation rules automatically run in sequence. However, it initially over-engineered the solution by suggesting a complex reflection-based assembly scanner to auto-register the rules, which I rejected and simplified down to explicit DI registration in Program.cs. 
+
+Copilot, conversely, was a lifesaver for the micro-level boilerplate. Typing // Test: validation rejects orders with negative quantity instantly produced a structurally perfect xUnit test with the correct Arrange, Act, and Assert phases. Yet, it wasn't flawless: Copilot blindly asserted that *any* generic Exception was thrown, rather than the specific ValidationException the new strategy uses. If left uncorrected, a random NullReferenceException would have passed the test, masking a real bug. 
+
+At 2 AM IST debugging a production outage, I would reach for Claude first to ingest the raw stack traces and hypothesize the architectural failure or root cause, but I would use Copilot inside the IDE to rapidly type out the actual localized hotfix once I understood the problem. You have to treat Claude like an overly enthusiastic architect and Copilot like a speedy but careless junior developer.
