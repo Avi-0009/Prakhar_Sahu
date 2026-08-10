@@ -1,0 +1,47 @@
+using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Linq;
+
+namespace OrderApi.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class OrderController : ControllerBase
+{
+    [HttpPost]
+    public async Task<IActionResult> CreateOrder([FromBody] dynamic payload)
+    {
+        // SMELL: Instantiating DbContext directly instead of DI
+        var db = new AppDbContext(); 
+        
+        try {
+            // SMELL: Null dereference waiting to happen
+            string customerName = payload.Customer.Name;
+            
+            // SMELL: Inline validation
+            if (string.IsNullOrEmpty(customerName) || payload.Items.Count == 0) {
+                return BadRequest(new { Error = "Invalid input" });
+            }
+
+            var order = new Order { CustomerName = customerName, OrderDate = DateTime.Now };
+            
+            // SMELL: Off-by-one error (<= instead of <)
+            for (int i = 0; i <= payload.Items.Count; i++) {
+                order.Total += payload.Items[i].Price;
+            }
+
+            // SMELL: Sync over Async
+            db.Orders.Add(order);
+            db.SaveChanges(); 
+
+            // SMELL: Untyped return
+            return Ok(new { Message = "Success", OrderId = order.Id });
+        } catch (NullReferenceException) {
+            // SMELL: Swallowed exception
+        } catch (IndexOutOfRangeException) {
+        } catch (Exception) {
+        }
+        
+        return StatusCode(500);
+    }
+}
