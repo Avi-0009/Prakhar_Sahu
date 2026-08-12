@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
@@ -17,20 +18,20 @@ public class AuthIntegrationTests : IClassFixture<WebApplicationFactory<Program>
     [Fact]
     public async Task GetQuotes_Anonymous_ReturnsOk()
     {
-        // Act
         var response = await _client.GetAsync("/api/quotes");
 
-        // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
     public async Task PostQuote_Anonymous_ReturnsUnauthorized_401()
     {
-        // Act
-        var response = await _client.PostAsync("/api/quotes", new StringContent(""));
+        // Send actual JSON so it passes the Media Type check and hits the Auth check
+        var json = "{\"author\":\"test\",\"text\":\"test\"}";
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        
+        var response = await _client.PostAsync("/api/quotes", content);
 
-        // Assert
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
@@ -43,8 +44,4 @@ public class AuthIntegrationTests : IClassFixture<WebApplicationFactory<Program>
         // Assert
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
-
-    // Note: To fully test 403 Forbidden and 200 OK for protected routes, 
-    // you would typically inject a mock JWT token provider or use a TestAuthHandler.
-    // This scaffold proves the pipeline blocks unauthorized users end-to-end.
 }
