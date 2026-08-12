@@ -1,0 +1,28 @@
+name: Day 3 CI Pipeline
+
+on:
+  push:
+    branches: [ "main", "feature/*" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore Day3/piece3/QuotesApi.Tests/QuotesApi.Tests.csproj
+
+    - name: Build
+      run: dotnet build Day3/piece3/QuotesApi.Tests/QuotesApi.Tests.csproj --no-restore
+
+    - name: Test
+      run: dotnet test Day3/piece3/QuotesApi.Tests/QuotesApi.Tests.csproj --no-build --verbosity normal
