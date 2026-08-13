@@ -20,14 +20,13 @@ jobs:
         dotnet-version: 10.0.x
 
     - name: Restore dependencies
-      run: dotnet restore Day4/piece1/QuotesApi.Tests.Integration/QuotesApi.Tests.Integration.csproj
+      run: dotnet restore Day4/piece2/QuotesApi.Tests.Integration/QuotesApi.Tests.Integration.csproj
 
     - name: Build
-      run: dotnet build Day4/piece1/QuotesApi.Tests.Integration/QuotesApi.Tests.Integration.csproj --no-restore
+      run: dotnet build Day4/piece2/QuotesApi.Tests.Integration/QuotesApi.Tests.Integration.csproj --no-restore
 
     - name: Test and Collect Coverage
-      # Notice the --settings flag added here!
-      run: dotnet test Day4/piece1/QuotesApi.Tests.Integration/QuotesApi.Tests.Integration.csproj --no-build --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage" --settings Day4/piece1/coverlet.runsettings --results-directory ./TestResults
+      run: dotnet test Day4/piece2/QuotesApi.Tests.Integration/QuotesApi.Tests.Integration.csproj --no-build --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage" --settings Day4/piece2/coverlet.runsettings --results-directory ./TestResults
 
     - name: Enforce Code Coverage Threshold (Fail < 70%)
       uses: irongut/CodeCoverageSummary@v1.3.0
