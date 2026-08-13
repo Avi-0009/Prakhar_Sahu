@@ -1,3 +1,4 @@
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
@@ -22,7 +23,12 @@ builder.Services.AddOpenTelemetry()
         .AddAspNetCoreInstrumentation()
         .AddEntityFrameworkCoreInstrumentation()
         .AddHttpClientInstrumentation()
-        .AddOtlpExporter(options => options.ExportProcessorType = OpenTelemetry.ExportProcessorType.Simple));
+        .AddOtlpExporter(options => options.ExportProcessorType = OpenTelemetry.ExportProcessorType.Simple))
+    .UseAzureMonitor(options => 
+    {
+        // In production, this comes securely from Azure Key Vault via IConfiguration
+        options.ConnectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"];
+    });
 
 var app = builder.Build();
 
@@ -61,6 +67,7 @@ app.Run();
 public partial class Program { }
 
 public partial class Program { }
+
 
 
 
