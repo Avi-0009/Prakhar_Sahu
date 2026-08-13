@@ -22,7 +22,7 @@ builder.Services.AddOpenTelemetry()
         .AddAspNetCoreInstrumentation()
         .AddEntityFrameworkCoreInstrumentation()
         .AddHttpClientInstrumentation()
-        .AddOtlpExporter());
+        .AddOtlpExporter(options => options.ExportProcessorType = OpenTelemetry.ExportProcessorType.Simple));
 
 var app = builder.Build();
 
@@ -61,6 +61,7 @@ app.Run();
 public partial class Program { }
 
 public partial class Program { }
+
 
 
 
