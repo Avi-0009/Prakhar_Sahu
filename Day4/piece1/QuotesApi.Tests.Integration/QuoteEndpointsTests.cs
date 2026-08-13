@@ -77,14 +77,30 @@ public class QuoteEndpointsTests : IClassFixture<CustomWebApplicationFactory>, I
         
         var refreshDict = await refreshResponse.Content.ReadFromJsonAsync<Dictionary<string, JsonElement>>();
         var newAccessToken = refreshDict!.FirstOrDefault(k => k.Key.Equals("accessToken", StringComparison.OrdinalIgnoreCase)).Value.GetString();
+        var newRefreshToken = refreshDict!.FirstOrDefault(k => k.Key.Equals("refreshToken", StringComparison.OrdinalIgnoreCase)).Value.GetString();
 
         // 4. CREATE QUOTE
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", newAccessToken);
         var quoteRequest = new { Author = "Marcus Aurelius", Text = "Amor Fati" };
         var quoteResponse = await _client.PostAsJsonAsync("/api/quotes", quoteRequest);
         
-        // This will print the EXACT error message from the API if it fails!
         var errorBody = await quoteResponse.Content.ReadAsStringAsync();
         quoteResponse.IsSuccessStatusCode.Should().BeTrue("API rejected quote creation. Status: {0}, Error: {1}", quoteResponse.StatusCode, errorBody);
+
+        // 5. FETCH & DELETE QUOTE (Coverage Boosters!)
+        var quoteLocation = quoteResponse.Headers.Location;
+        if (quoteLocation != null)
+        {
+            var fetchResponse = await _client.GetAsync(quoteLocation);
+            fetchResponse.IsSuccessStatusCode.Should().BeTrue();
+            
+            var deleteResponse = await _client.DeleteAsync(quoteLocation);
+            deleteResponse.IsSuccessStatusCode.Should().BeTrue();
+        }
+
+        // 6. LOGOUT (Coverage Booster!)
+        var logoutRequest = new { RefreshToken = newRefreshToken };
+        var logoutResponse = await _client.PostAsJsonAsync("/api/auth/logout", logoutRequest);
+        logoutResponse.IsSuccessStatusCode.Should().BeTrue();
     }
 }
