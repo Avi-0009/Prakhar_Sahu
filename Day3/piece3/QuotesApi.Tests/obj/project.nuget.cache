@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "0jDQfwHMVr4=",
+  "dgSpecHash": "sjZFUL2iC0E=",
   "success": true,
-  "projectFilePath": "d:\\ThinkBridge\\Day3\\piece3\\QuotesApi.Tests\\QuotesApi.Tests.csproj",
+  "projectFilePath": "D:\\ThinkBridge\\Day3\\piece3\\QuotesApi.Tests\\QuotesApi.Tests.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\prakh\\.nuget\\packages\\bcrypt.net-next\\4.2.0\\bcrypt.net-next.4.2.0.nupkg.sha512",
     "C:\\Users\\prakh\\.nuget\\packages\\coverlet.collector\\6.0.4\\coverlet.collector.6.0.4.nupkg.sha512",
@@ -80,9 +80,9 @@
       "code": "NU1903",
       "level": "Warning",
       "message": "Package 'SQLitePCLRaw.lib.e_sqlite3' 2.1.11 has a known high severity vulnerability, https://github.com/advisories/GHSA-2m69-gcr7-jv3q",
-      "projectPath": "d:\\ThinkBridge\\Day3\\piece3\\QuotesApi.Tests\\QuotesApi.Tests.csproj",
+      "projectPath": "D:\\ThinkBridge\\Day3\\piece3\\QuotesApi.Tests\\QuotesApi.Tests.csproj",
       "warningLevel": 1,
-      "filePath": "d:\\ThinkBridge\\Day3\\piece3\\QuotesApi.Tests\\QuotesApi.Tests.csproj",
+      "filePath": "D:\\ThinkBridge\\Day3\\piece3\\QuotesApi.Tests\\QuotesApi.Tests.csproj",
       "libraryId": "SQLitePCLRaw.lib.e_sqlite3",
       "targetGraphs": [
         "net10.0"
