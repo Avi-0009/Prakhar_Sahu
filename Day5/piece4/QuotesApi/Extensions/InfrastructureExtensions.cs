@@ -13,6 +13,8 @@ namespace QuotesApi.Extensions;
 
 public static class InfrastructureExtensions
 {
+    private const string PublicCloudInstance = "https://login.microsoftonline.com/";
+
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
         services.AddDbContext<AppDbContext>(options =>
@@ -20,10 +22,36 @@ public static class InfrastructureExtensions
 
         services.AddScoped<IQuoteRepository, QuoteRepository>();
         services.AddSingleton<IClock, SystemClock>();
-        
+
         services.AddScoped<IAuthorizationHandler, IsOwnerHandler>();
 
-        services.AddAuthentication(options =>
+        // The signing key is deliberately not defaulted. A fallback key checked
+        // into source means anyone who can read the repo can mint valid tokens,
+        // so refuse to start rather than sign with a publicly known secret.
+        var signingKey = config["Jwt:Key"];
+        if (string.IsNullOrWhiteSpace(signingKey))
+        {
+            throw new InvalidOperationException(
+                "Jwt:Key is not configured. Set the Jwt__Key environment variable " +
+                "(locally in .env, in Azure via 'azd env set JWT_SIGNING_KEY <value>').");
+        }
+
+        if (Encoding.UTF8.GetByteCount(signingKey) < 32)
+        {
+            throw new InvalidOperationException(
+                "Jwt:Key must be at least 32 bytes to sign with HMAC-SHA256.");
+        }
+
+        // Entra is optional. Previously the Entra scheme was always registered
+        // and built its authority from EntraId:Instance, which was never set --
+        // producing a schemeless authority that throws the first time a
+        // Microsoft-issued token arrives.
+        var entraTenantId = config["EntraId:TenantId"];
+        var entraAudience = config["EntraId:Audience"];
+        var entraEnabled = !string.IsNullOrWhiteSpace(entraTenantId)
+                           && !string.IsNullOrWhiteSpace(entraAudience);
+
+        var authentication = services.AddAuthentication(options =>
         {
             options.DefaultAuthenticateScheme = "Dynamic";
             options.DefaultChallengeScheme = "Dynamic";
@@ -38,19 +66,39 @@ public static class InfrastructureExtensions
                 ValidateIssuerSigningKey = true,
                 ValidIssuer = config["Jwt:Issuer"],
                 ValidAudience = config["Jwt:Audience"],
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]!)),
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
                 ClockSkew = TimeSpan.Zero
             };
-        })
-        .AddJwtBearer("Entra", options =>
+        });
+
+        if (entraEnabled)
         {
-            options.Authority = $"{config["EntraId:Instance"]}{config["EntraId:TenantId"]}/v2.0";
-            options.Audience = config["EntraId:Audience"];
-        })
-        .AddPolicyScheme("Dynamic", "JWT or Entra", options =>
+            var instance = config["EntraId:Instance"];
+            if (string.IsNullOrWhiteSpace(instance))
+            {
+                instance = PublicCloudInstance;
+            }
+            if (!instance.EndsWith('/'))
+            {
+                instance += "/";
+            }
+
+            authentication.AddJwtBearer("Entra", options =>
+            {
+                options.Authority = $"{instance}{entraTenantId}/v2.0";
+                options.Audience = entraAudience;
+            });
+        }
+
+        authentication.AddPolicyScheme("Dynamic", "JWT or Entra", options =>
         {
             options.ForwardDefaultSelector = context =>
             {
+                if (!entraEnabled)
+                {
+                    return "SelfHosted";
+                }
+
                 var authHeader = context.Request.Headers.Authorization.ToString();
                 if (authHeader.StartsWith("Bearer "))
                 {
