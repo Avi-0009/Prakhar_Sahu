@@ -28,9 +28,10 @@
   </ItemGroup>
 
   <PropertyGroup>
-    <ContainerRepository>quotes-api</ContainerRepository>
+    <ContainerImageName>quotes-api</ContainerImageName>
     <ContainerImageTag>0.1.0</ContainerImageTag>
     <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:10.0</ContainerBaseImage>
+    <ContainerUser>root</ContainerUser>
   </PropertyGroup>
 </Project>
 
