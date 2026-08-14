@@ -32,7 +32,7 @@ public static class QuoteEndpointExtensions
             
             using var activity = ActivitySource.StartActivity("compute-quote-creation");
             activity?.SetTag("user.id", userId);
-            System.Threading.Thread.Sleep(1500);
+            // System.Threading.Thread.Sleep(1500);
 
             var result = Quote.Create(request.Author, request.Text, clock.UtcNow, userId);
             if (!result.IsSuccess) 
@@ -78,6 +78,7 @@ public static class QuoteEndpointExtensions
         }).RequireAuthorization();
     }
 }
+
 
 
 
