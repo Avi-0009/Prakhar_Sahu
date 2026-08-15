@@ -3594,11 +3594,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "d:\\ThinkBridge\\Day3\\piece3\\QuotesApi.Tests\\QuotesApi.Tests.csproj",
+      "projectUniqueName": "D:\\ThinkBridge\\Day3\\piece3\\QuotesApi.Tests\\QuotesApi.Tests.csproj",
       "projectName": "QuotesApi.Tests",
-      "projectPath": "d:\\ThinkBridge\\Day3\\piece3\\QuotesApi.Tests\\QuotesApi.Tests.csproj",
+      "projectPath": "D:\\ThinkBridge\\Day3\\piece3\\QuotesApi.Tests\\QuotesApi.Tests.csproj",
       "packagesPath": "C:\\Users\\prakh\\.nuget\\packages\\",
-      "outputPath": "d:\\ThinkBridge\\Day3\\piece3\\QuotesApi.Tests\\obj\\",
+      "outputPath": "D:\\ThinkBridge\\Day3\\piece3\\QuotesApi.Tests\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -3620,8 +3620,8 @@
           "framework": "net10.0",
           "targetAlias": "net10.0",
           "projectReferences": {
-            "d:\\ThinkBridge\\Day3\\piece3\\QuotesApi\\QuotesApi.csproj": {
-              "projectPath": "d:\\ThinkBridge\\Day3\\piece3\\QuotesApi\\QuotesApi.csproj"
+            "D:\\ThinkBridge\\Day3\\piece3\\QuotesApi\\QuotesApi.csproj": {
+              "projectPath": "D:\\ThinkBridge\\Day3\\piece3\\QuotesApi\\QuotesApi.csproj"
             }
           }
         }
