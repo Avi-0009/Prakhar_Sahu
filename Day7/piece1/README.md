@@ -1,5 +1,5 @@
 ### GitHub link
-https://github.com/Avi-0009/Prakhar_Sahu/tree/feature/day7-piece1/Day7/piece1
+https://github.com/thinkbridge-thinkschool/thinkschool--PrakharSahu/tree/feature/day7-piece1/Day7/piece1
 
 ### Exercise
 ![CTE Result](./cte-result.png)
