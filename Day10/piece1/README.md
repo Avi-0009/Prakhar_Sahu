@@ -91,7 +91,7 @@ rather than the per-thread counter, since ADO.NET does some of its allocating of
 | \AsNoTracking()\ | 14.8 | 2.99 | ~4x faster, 2.9x less memory |
 | \AsNoTrackingWithIdentityResolution()\ | 12.0 | 8.30 | ~4x faster, same memory |
 
-![EF Core Benchmark](./efcore-benchmark.png)
+![EF Core Benchmark](./EfCorePerformance/Screenshots/efcore-benchmark.png)
 
 Full output is in \enchmark-output.txt\. I started at 5 iterations and the timings were all over
 the place (the identity resolution row swung between 18 and 78 ms). Going to 9 iterations settled
