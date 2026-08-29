@@ -25,6 +25,8 @@ env:
   SWA_NAME: swa-quotes-day17
   BFF_APP_NAME: quotes-bff
   API_APP_NAME: quotes-api
+  # The nginx static host used when Static Web Apps cannot be created in this subscription.
+  WEB_APP_NAME: quotes-web
 
 concurrency:
   group: day17-deploy
@@ -100,28 +102,64 @@ jobs:
           npm ci
           npx ng build --configuration production
 
-      # Fetched through the OIDC session and used within the same step. Storing it as a
-      # GitHub secret would work, but it would also be one more long-lived credential to
-      # rotate — and the whole point of today is not having any.
-      - name: Publish to Static Web Apps
+      # Static Web Apps is the intended host and is tried first. It is not always creatable:
+      # SWA exists only in centralus, eastus2, westus2, westeurope and eastasia, and a
+      # subscription carrying the sys.regionrestriction policy may permit none of those — on
+      # Azure for Students the permitted set is disjoint from SWA's, and the policy is
+      # Microsoft-locked. Falling back to the same nginx-on-Container-Apps host that
+      # scripts/deploy.sh uses keeps this pipeline honest instead of red for a reason nobody
+      # can act on.
+      #
+      # When the SWA path IS taken, the deployment token is fetched through the OIDC session
+      # and used within this one step. Storing it as a GitHub secret would work, but it would
+      # be one more long-lived credential to rotate, and the point of today is not having any.
+      - name: Publish the frontend
+        id: frontend
         run: |
           set -euo pipefail
-          TOKEN=$(az staticwebapp secrets list -n "$SWA_NAME" -g "$RESOURCE_GROUP" \
-            --query properties.apiKey -o tsv)
-          npx --yes @azure/static-web-apps-cli@latest deploy \
-            Day17/frontend/dist/quotes-web/browser \
-            --deployment-token "$TOKEN" \
-            --env production
+
+          if az staticwebapp show -n "$SWA_NAME" -g "$RESOURCE_GROUP" >/dev/null 2>&1; then
+            echo "Static Web App '$SWA_NAME' found — publishing there."
+            TOKEN=$(az staticwebapp secrets list -n "$SWA_NAME" -g "$RESOURCE_GROUP" \
+              --query properties.apiKey -o tsv)
+            npx --yes @azure/static-web-apps-cli@latest deploy \
+              Day17/frontend/dist/quotes-web/browser \
+              --deployment-token "$TOKEN" \
+              --env production
+            URL="https://$(az staticwebapp show -n "$SWA_NAME" -g "$RESOURCE_GROUP" \
+              --query defaultHostname -o tsv)"
+          else
+            echo "::notice::Static Web Apps is not creatable in this subscription (sys.regionrestriction). Publishing to the nginx host on Container Apps instead."
+            ACR=$(az acr list -g "$RESOURCE_GROUP" --query "[0].name" -o tsv)
+            SERVER=$(az acr show -n "$ACR" --query loginServer -o tsv)
+            TAG="${GITHUB_SHA::12}"
+            # The Angular build runs inside this image, after set-bff-url.mjs has already
+            # stamped the broker hostname into environment.production.ts.
+            docker build -t "$SERVER/quotes-web:$TAG" Day17/frontend
+            docker push "$SERVER/quotes-web:$TAG"
+            az containerapp update -n "$WEB_APP_NAME" -g "$RESOURCE_GROUP" \
+              --image "$SERVER/quotes-web:$TAG"
+            URL="https://$(az containerapp show -n "$WEB_APP_NAME" -g "$RESOURCE_GROUP" \
+              --query properties.configuration.ingress.fqdn -o tsv)"
+          fi
+
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Frontend published to $URL"
 
       - name: Smoke-test the deployment
         run: |
           set -euo pipefail
-          SWA_URL="https://$(az staticwebapp show -n "$SWA_NAME" -g "$RESOURCE_GROUP" \
-            --query defaultHostname -o tsv)"
+          SWA_URL="${{ steps.frontend.outputs.url }}"
           BFF="${{ steps.bff.outputs.origin }}"
 
+          # A new Container Apps revision takes a moment to accept traffic, so this retries
+          # rather than racing it and failing on a deployment that is merely still starting.
           echo "Checking $SWA_URL"
-          curl -sf -o /dev/null "$SWA_URL"
+          for attempt in 1 2 3 4 5 6 7 8; do
+            if curl -sf -o /dev/null "$SWA_URL"; then break; fi
+            [ "$attempt" -eq 8 ] && { echo "::error::$SWA_URL never became reachable."; exit 1; }
+            echo "  not ready yet, retrying ($attempt/8)…"; sleep 15
+          done
 
           # The managed-identity hop, asserted rather than assumed: the API is asked who it
           # just authenticated, and the answer has to be an application identity.
