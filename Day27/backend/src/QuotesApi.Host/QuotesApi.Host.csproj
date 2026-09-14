@@ -20,6 +20,17 @@
     <PackageReference Include="DotNetEnv" Version="3.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
+    <!--
+      Required on the STARTUP project, not just on the one holding the DbContext. The EF
+      tools build the startup project to obtain the service provider, so with the context
+      moved into QuotesApi.Persistence this reference has to be here or every
+      `dotnet ef migrations` command fails with "your startup project does not reference
+      Microsoft.EntityFrameworkCore.Design". It was implicit when the API was one project.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
