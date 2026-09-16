@@ -10,11 +10,9 @@ public static class BillingModule
 {
     public static IServiceCollection AddBilling(this IServiceCollection services)
     {
-        services.AddScoped<IInvoiceRepository>(_ => Store);
+        services.AddScoped<IInvoiceRepository, EfInvoiceRepository>();
         services.AddScoped<IIntegrationEventHandler<WorkOrderCompletedV1>, WorkOrderCompletedHandler>();
 
         return services;
     }
-
-    private static readonly InMemoryInvoiceStore Store = new();
 }

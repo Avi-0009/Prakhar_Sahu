@@ -10,7 +10,7 @@ public static class SchedulingModule
 {
     public static IServiceCollection AddScheduling(this IServiceCollection services)
     {
-        services.AddScoped<IReservationRepository>(_ => Store);
+        services.AddScoped<IReservationRepository, EfReservationRepository>();
 
         // Scheduling's entire inbound surface: two subscriptions and no HTTP endpoints of its
         // own yet. A module that only reacts is a perfectly good module.
@@ -19,6 +19,4 @@ public static class SchedulingModule
 
         return services;
     }
-
-    private static readonly InMemoryReservationStore Store = new();
 }
