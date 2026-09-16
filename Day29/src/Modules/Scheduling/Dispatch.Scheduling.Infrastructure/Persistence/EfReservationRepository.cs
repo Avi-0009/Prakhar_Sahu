@@ -53,4 +53,6 @@ public sealed class EfReservationRepository(SchedulingDbContext db) : IReservati
         await db.Reservations.AddAsync(reservation, ct);
         await db.SaveChangesAsync(ct);
     }
+
+    public Task SaveChangesAsync(CancellationToken ct = default) => db.SaveChangesAsync(ct);
 }

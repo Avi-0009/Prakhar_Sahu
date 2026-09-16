@@ -15,6 +15,25 @@ public interface IReservationRepository
     Task<Reservation?> GetByWorkOrderAsync(Guid workOrderId, CancellationToken ct = default);
 
     Task AddAsync(Reservation reservation, CancellationToken ct = default);
+
+    /// <summary>
+    /// Flushes changes made to a reservation that was loaded from this repository.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This method exists because of a bug the move to a real database exposed.
+    /// <c>WorkOrderReleasedHandler</c> loaded a reservation, called <c>Release()</c> on it, and
+    /// stopped. Against a dictionary that was correct by accident: the object in the dictionary
+    /// <em>was</em> the entity, so mutating it was instantly visible to the next reader.
+    /// </para>
+    /// <para>
+    /// Against EF the change sits in the change tracker and is discarded when the scope ends. The
+    /// slot was never released, the technician stayed booked, and nothing failed -- the only
+    /// symptom was a rebooking that came back refused. Silent, and caught by the smoke test
+    /// rather than by any unit test, because every unit test used the dictionary.
+    /// </para>
+    /// </remarks>
+    Task SaveChangesAsync(CancellationToken ct = default);
 }
 
 /// <summary>
@@ -106,6 +125,8 @@ public sealed class WorkOrderReleasedHandler(
         }
 
         reservation.Release();
+        await reservations.SaveChangesAsync(cancellationToken);
+
         logger.LogInformation("Released the slot for work order {WorkOrderId}: {Reason}.", e.WorkOrderId, e.Reason);
     }
 }

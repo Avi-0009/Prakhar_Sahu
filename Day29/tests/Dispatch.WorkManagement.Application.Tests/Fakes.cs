@@ -81,6 +81,11 @@ internal sealed class FakeReservationRepository : IReservationRepository
         _reservations[reservation.Id] = reservation;
         return Task.CompletedTask;
     }
+
+    // Nothing to flush: the dictionary holds the entity itself, so a mutation is already visible.
+    // That is exactly why the missing save in WorkOrderReleasedHandler was invisible to these
+    // tests -- a fake that cannot reproduce a failure mode cannot warn you about it.
+    public Task SaveChangesAsync(CancellationToken ct = default) => Task.CompletedTask;
 }
 
 internal sealed class FakeInvoiceRepository : IInvoiceRepository
