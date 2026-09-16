@@ -18,4 +18,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!--
+      Required on the STARTUP project, not just where the DbContext lives. The EF tools build the
+      startup project to obtain its service provider, so without this every `dotnet ef migrations`
+      command fails with "your startup project doesn't reference Microsoft.EntityFrameworkCore.Design".
+      The same trap cost time on Day 27; it is written down here so it costs none next time.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
 </Project>
