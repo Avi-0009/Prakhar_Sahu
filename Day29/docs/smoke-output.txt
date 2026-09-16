@@ -1,11 +1,11 @@
 === Building ===
   built.
-  API up on http://localhost:5322 (pid 2215)
+  API up on http://localhost:5322 (pid 982)
 
 ================================================================
  1. Raise a work order
 ================================================================
-  HTTP 201  id=01a06bb8-6ded-79ec-a1f4-4e619ea5afaa
+  HTTP 201  id=01a0a91e-c1ab-78db-abad-75387cf0bc8a
   [PASS] created
 
 ================================================================
@@ -21,12 +21,12 @@
 ================================================================
   triage -> HTTP 204
       {
-        "id": "01a06bb8-6ded-79ec-a1f4-4e619ea5afaa",
+        "id": "01a0a91e-c1ab-78db-abad-75387cf0bc8a",
         "status": "Triaged",
         "summary": "Chiller unit is not holding temperature",
         "address": "Unit 4, Example Industrial Estate, Testville TV1 9ZZ",
         "priority": "High",
-        "dueBy": "2026-09-05T09:20:44.013879+00:00",
+        "dueBy": "2026-09-17T07:29:20.2991674+00:00",
         "technicianId": null,
         "window": null,
         "totalLabourMinutes": 0,

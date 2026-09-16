@@ -27,7 +27,7 @@ section() { printf '\n==========================================================
 WORK="$ROOT/.smoke-tmp"; mkdir -p "$WORK"
 winpath() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
 fetch()   { local n="$1"; shift; curl -s -o "$(winpath "$WORK/$n")" -w '%{http_code}' "$@"; }
-field()   { node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s)['$2']??'')}catch{console.log('')}})" < "$WORK/$1"; }
+field()   { node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{process.stdout.write(String(JSON.parse(s)['$2']??''))}catch{process.stdout.write('')}})" < "$WORK/$1"; }
 pretty()  { node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.stringify(JSON.parse(s),null,2).replace(/^/gm,"      "))}catch{console.log("      "+s.trim())}})' < "$WORK/$1"; }
 json()    { printf '%s' "$1"; }
 
@@ -59,7 +59,14 @@ curl -sf "$BASE/health" >/dev/null 2>&1 || { echo "API did not start:"; tail -25
 echo "  API up on $BASE (pid $SERVER_PID)"
 
 CUSTOMER="11111111-1111-1111-1111-111111111111"
-TECH="22222222-2222-2222-2222-222222222222"
+# A FRESH technician per run, because the database now remembers.
+#
+# This was a fixed GUID when all three stores were dictionaries and every run started empty. With
+# real persistence the reservations from the last run are still there, so the second run booked a
+# technician who was already busy, got compensated back to Triaged, and three assertions failed --
+# with nothing wrong in the code. A smoke test that only passes against an empty database is not
+# a smoke test.
+TECH="$(node -e 'console.log(require("crypto").randomUUID())')"
 START="$(node -e 'console.log(new Date(Date.now()+3600e3).toISOString())')"
 END="$(node -e 'console.log(new Date(Date.now()+7200e3).toISOString())')"
 
@@ -137,7 +144,11 @@ info "start before the window opens -> $(field st.json code)"
 # The window opens an hour from now, so the honest thing this script can show over HTTP is the
 # refusal. The domain tests drive the clock forward and cover the rest.
 fetch inv.json "$BASE/api/invoices" >/dev/null
-COUNT=$(node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).length)}catch{console.log("?")}})' < "$WORK/inv.json")
+# process.stdout.write, not console.log. console.log applies util.inspect formatting, which
+# COLOURS a number when it believes stdout is a TTY -- so COUNT came back as the five characters
+# \e[33m0\e[39m and `[ "$COUNT" = "0" ]` was false while the value was right. Environment-
+# dependent, which is the worst kind: it passed on the machine it was written on.
+COUNT=$(node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(String(JSON.parse(s).length))}catch{process.stdout.write("?")}})' < "$WORK/inv.json")
 info "invoices so far: $COUNT"
 [ "$COUNT" = "0" ] && ok "nothing invoiced - no order has been completed" || no "unexpected invoices: $COUNT"
 
