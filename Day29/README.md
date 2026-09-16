@@ -1,3 +1,25 @@
+# Day 29 — Build day 1: foundation + happy path
+
+The Dispatch capstone, carried forward from the Day 22 design scaffold and given a real database.
+
+**Deliverable:** [EXERCISE.md](EXERCISE.md) — the commit log, the happy path against Azure SQL,
+and the two bugs the move exposed.
+
+| | |
+|---|---|
+| Tests | 58 passed, 0 failed |
+| Happy path | 8 passed, 0 failed against Azure SQL, re-run 3x |
+| Database | `sql-dispatch-dev-zgdsji` / `dispatch`, three schemas |
+
+```bash
+cd Day29
+export ConnectionStrings__Dispatch="Server=tcp:sql-dispatch-dev-zgdsji.database.windows.net,1433;Initial Catalog=dispatch;Encrypt=True;Connection Timeout=60;Authentication=Active Directory Default"
+dotnet test
+bash scripts/smoke.sh
+```
+
+---
+
 # Day 22 piece 2 — Capstone kickoff: Dispatch
 
 A field-service platform, designed as a **modular monolith** with clean architecture inside each

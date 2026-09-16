@@ -1,271 +1,228 @@
-# Day 22 piece 2 — Capstone kickoff: design + scaffold
+# Day 29 — Build day 1: foundation + happy path
 
-> **Exercise:** Paste the repo URL + the one-page design (contexts, aggregate, async flows) and
-> the scaffolded solution layout.
+> **Exercise:** Paste the repo URL + the commit log for the day. Show the happy path working
+> (a short clip or curl/UI walkthrough).
 
----
-
-## Repo
-
-```
-https://github.com/Avi-0009/Prakhar_Sahu        Day22/piece2/
-https://github.com/thinkbridge-thinkschool/thinkschool---Prakhar-Sahu   Day22/piece2/
-```
-
-Branch: `feature/day22-piece2`. Everything below is in `Day22/piece2/`.
-
----
-
-## The one-page design
-
-Full version: **[DESIGN.md](DESIGN.md)**. Condensed here.
-
-### The product slice
-
-A field-service platform. A customer reports a fault → someone triages it → a technician is
-booked → the work is done → the customer is invoiced.
-
-One slice followed all the way through, rather than a thin layer across many features. The
-questions worth answering at kickoff — where do the boundaries go, what must be transactionally
-consistent, what can be eventually consistent — only surface when one path is followed end to end.
-
-### Bounded contexts
-
-| Context | Owns the question | Core aggregate |
-|---|---|---|
-| **WorkManagement** *(core)* | What needs doing, and how far along is it? | `WorkOrder` |
-| **Scheduling** *(supporting)* | Who is free, and when? | `Reservation` |
-| **Billing** *(supporting)* | What does it cost, and who pays? | `Invoice` |
-
-**The word that proves the boundaries are real: "technician".**
-
-- In **WorkManagement** it is a `TechnicianId` and nothing else — all a work order needs is who to
-  attribute labour to.
-- In **Scheduling** it has a calendar, a shift and a skill set. It is what the module is built
-  around.
-- In **Billing** it does not exist. An invoice is priced from minutes and a rate; who did the work
-  is not an accounting concern.
-
-Three models of one word, none of them wrong. The alternative — one shared `Technician` class
-carrying every field any context ever needed — satisfies none of them and cannot be changed by any
-of them without consulting the other two. That shared class is the most common way a "modular"
-system turns out not to be.
-
-### The core aggregate
-
-```
-Raised ──triage──▶ Triaged ──schedule──▶ Scheduled ──start──▶ InProgress ──complete──▶ Completed
-                      ▲                       │
-                      └────returnToTriage─────┘        (Scheduling refused the booking)
-
-   any state except Completed ──cancel──▶ Cancelled
-```
-
-**Inside the boundary:** the order's state, its scheduled window, its labour entries.
-**Outside, by id:** technician, customer, invoice.
-
-An aggregate is a **transactional consistency boundary**, not a convenience grouping. The test for
-membership is whether an invariant requires it to be consistent *at the moment of commit*.
-
-- Labour entries are **in**, because *"cannot complete with no labour logged"* must be answerable
-  without a query. Move them out and the check becomes a race.
-- Technician is **out**. No invariant of a work order depends on a technician's internal state.
-  Pulling them in would mean loading a technician to save a work order, locking that row against
-  every other order being saved at that moment — a busy technician would become the system's
-  hottest write lock, protecting a rule that is not even about them.
-- Invoice is **out**. A work order that could not be completed while the accounting system was
-  down would couple a field engineer's day to a ledger.
-
-Every mutation returns `Result` rather than throwing — a dispatcher clicking "start" on an order
-somebody else just cancelled is normal traffic from a stale UI, not an exceptional condition.
-Every property has a private setter, so the only route into a new state is a method named after
-something that happens in the business.
-
-### Async flows
-
-**1. Scheduling — a saga with a compensating action**
-
-```
-WorkManagement                    Scheduling
-──────────────                    ──────────
-Schedule()  ──── WorkOrderScheduledV1 ────▶  is the technician free?
-  status = Scheduled                              ├── yes ──▶ TechnicianReservedV1
-  (committed)                                     └── no ───▶ TechnicianReservationFailedV1
-  ReturnToTriage()  ◀───────────────────────────────────────────┘
-```
-
-WorkManagement asserts *intent*, not fact — it cannot see a calendar and never should. Two modules
-cannot share a transaction, so the price of the boundary is a compensating action rather than a
-distributed transaction.
-
-**2. Billing — decoupling the critical path**
-
-```
-WorkManagement ──── WorkOrderCompletedV1 ────▶ Billing: draft an invoice
-```
-
-A field engineer taps "done" on a phone with two bars of signal. If completion required Billing to
-price and store an invoice in the same request, an accounting problem would stop engineers
-finishing work. Everything Billing needs travels **on the event**, so it never calls back — a
-synchronous query across a module boundary is a synchronous coupling wearing an asynchronous
-costume.
-
-**3. SLA sweeper — reacting to the absence of an event**
-
-A `BackgroundService` on a timer. The other flows react to something someone caused; this reacts to
-*nothing happening*, which is the whole problem with deadlines. Breach is computed, never stored.
-
----
-
-## The scaffolded solution layout
-
-```
-Dispatch.slnx                                   16 projects
-├── src/
-│   ├── Dispatch.Api/                           ← single deployable; composition root
-│   │   ├── Messaging/InProcessIntegrationEventPublisher.cs
-│   │   └── Endpoints/WorkOrderEndpoints.cs
-│   ├── Dispatch.SharedKernel/                  ← Entity, AggregateRoot, Result, events, IClock
-│   │   ├── Entity.cs   Result.cs   Events.cs   Messaging.cs
-│   └── Modules/
-│       ├── WorkManagement/
-│       │   ├── Dispatch.WorkManagement.Contracts/        ← the ONLY door in
-│       │   │   └── WorkManagementEvents.cs
-│       │   ├── Dispatch.WorkManagement.Domain/           ← the aggregate + invariants
-│       │   │   └── WorkOrders/{WorkOrder,ValueObjects,Identifiers,Events,Errors}.cs
-│       │   ├── Dispatch.WorkManagement.Application/      ← use cases + ports
-│       │   │   ├── Abstractions/Ports.cs
-│       │   │   └── WorkOrders/{WorkOrderService,ReservationFailedHandler}.cs
-│       │   └── Dispatch.WorkManagement.Infrastructure/   ← adapters + registration
-│       │       ├── Persistence/InMemoryWorkOrderStore.cs
-│       │       ├── SlaSweeper.cs
-│       │       └── WorkManagementModule.cs
-│       ├── Scheduling/       (identical four layers)
-│       └── Billing/          (identical four layers)
-└── tests/
-    ├── Dispatch.ArchitectureTests/              12 rules
-    ├── Dispatch.WorkManagement.Domain.Tests/    35 invariants
-    └── Dispatch.WorkManagement.Application.Tests/ 11 cross-module flows
-```
-
-### The reference graph
-
-Dependencies point inwards: `Infrastructure → Application → Domain → SharedKernel`. Ports are
-declared in Application and implemented in Infrastructure.
-
-**The only three cross-module edges in the entire solution:**
-
-```
-Dispatch.Scheduling.Application     → Dispatch.WorkManagement.Contracts
-Dispatch.Billing.Application        → Dispatch.WorkManagement.Contracts
-Dispatch.WorkManagement.Application → Dispatch.Scheduling.Contracts
-```
-
-Every one lands on `*.Contracts`. None reaches a `Domain`, `Application` or `Infrastructure`.
-
-Full generated graph: [`docs/reference-graph.txt`](docs/reference-graph.txt).
-
----
-
-## The part that is not just a folder layout
-
-**Twelve architecture tests fail the build on a violation.**
-
-| Rule | What it stops |
+| | |
 |---|---|
-| `Domain_depends_on_nothing_but_the_shared_kernel` | a domain model that needs a database to be tested |
-| `Application_never_references_infrastructure` | the inverted arrow that makes the layers decorative |
-| `Contracts_depend_on_nothing_but_the_shared_kernel` | one module's packages becoming everyone's |
-| `No_module_reaches_into_another_modules_internals` | two modules wearing two folder names |
-| `Only_the_host_composes_infrastructure` | a module reaching for another module's database |
-| `The_shared_kernel_depends_on_nothing` | a shared kernel that grows dependencies |
-| `Every_module_has_the_same_four_layers` | a module that put something in the wrong one |
-| `The_documented_cross_module_edges_are_the_only_ones` | a coupling nobody discussed |
-| `No_domain_assembly_knows_about_a_database_a_web_framework_or_a_broker` | transitive infrastructure |
-| `Contracts_expose_primitives_only` | a published event that freezes the internal model |
-| `Domain_events_never_leak_into_a_published_contract` | internal events becoming public API |
-| `Aggregate_roots_have_no_public_setters` | invariants downgraded to suggestions |
-
-**Proven, not asserted.** [`docs/architecture-guardrail-proof.txt`](docs/architecture-guardrail-proof.txt)
-adds `WorkManagement.Domain → Scheduling.Domain` on purpose and shows three rules catching it:
-
-```
-$ dotnet add Dispatch.WorkManagement.Domain reference Dispatch.Scheduling.Domain
-
-Dispatch.WorkManagement.Domain must reference only Dispatch.SharedKernel,
-  but also references: Dispatch.Scheduling.Domain
-Cross-module references must target *.Contracts only. Found:
-  Dispatch.WorkManagement.Domain -> Dispatch.Scheduling.Domain
-
-Failed!  - Failed: 3, Passed: 9, Total: 12
-```
-
-Nobody adds a forbidden reference on purpose. They add it at 5pm because the type they needed
-happened to be over there, and by the time anyone notices there are forty of them.
+| Repo | `github.com/thinkbridge-thinkschool/thinkschool--PrakharSahu` · branch `feature/day29` |
+| Commits today | **7** |
+| Tests | **58 passed, 0 failed** — unchanged from the design day |
+| Happy path | **8 passed, 0 failed** against Azure SQL, re-run 3× |
+| Database | `sql-dispatch-dev-zgdsji` / `dispatch` — three schemas |
 
 ---
 
-## Verification
+## What build day 1 was
 
-```
-tests/Dispatch.ArchitectureTests                 12 passed
-tests/Dispatch.WorkManagement.Domain.Tests       35 passed
-tests/Dispatch.WorkManagement.Application.Tests  11 passed
-scripts/smoke.sh (real HTTP, running host)        8 passed, 0 failed
-```
+From the [Day 28 build plan](../Day28/docs/build-plan.md), day 1:
 
-The smoke test drives a work order through the whole system over HTTP: raised → refused
-out-of-order transitions → triaged → scheduled → a clashing booking compensated back to triage →
-cancelled → the freed slot rebooked by another order.
+> *Persistence — EF Core, **a schema per module**, not a shared context.
+> **Exit:** the 58 existing tests pass unchanged against a real database.*
 
-### A real bug the tests found
+The happy path itself already existed: `Dispatch` was designed and scaffolded on Day 22 piece 2
+with the full lifecycle over HTTP — raise, triage, schedule, start, log labour, complete, cancel.
+What it did not have was anywhere to put the data. All three stores were dictionaries.
 
-`A_double_booked_technician_sends_the_order_back_to_triage` failed with *"Collection was
-modified"*.
-
-The in-process bus makes publishing **synchronous, and therefore re-entrant**:
-
-```
-Schedule() ─▶ publish WorkOrderScheduledV1
-           ─▶ Scheduling sees a clash, publishes TechnicianReservationFailedV1
-           ─▶ WorkManagement's handler calls ReturnToTriageAsync on THIS SAME aggregate
-           ─▶ the aggregate raises another domain event
-           ─▶ ...into the list the publish loop is still iterating
-```
-
-Fixed by snapshotting and clearing domain events *before* dispatching them. A broker would not
-have reproduced it — the compensating event would arrive in a later request on a freshly loaded
-aggregate — which is exactly why it is worth knowing now rather than the week the transport
-changes.
-
-A second defect surfaced over HTTP: `{"priority":"High"}` returned 400 because
-`System.Text.Json` binds enums numerically by default, making the API's contract a set of magic
-numbers. Fixed with `JsonStringEnumConverter`.
+So today was not about new features. It was about making the thing that already worked work
+**against real infrastructure**, and finding out what that broke.
 
 ---
 
-## Why a modular monolith and not microservices
+## The commit log
 
-The boundaries are real — versioned contracts, no access to internals, a build that fails if that
-changes. What is *not* real is the network between them: delivery is a method call.
+```
+199e6ae  Day 29: make the smoke script re-runnable against a real database
+cb8654e  Day 29: fix a release that was never saved
+f562a37  Day 29: wire the connection string and add the initial migrations
+45127cb  Day 29: persist Scheduling and Billing, each in its own schema
+e22ebdb  Day 29: persist WorkManagement with EF Core, one context per module
+b8a5598  Day 29: start build day 1 from the Day 22 design scaffold
+```
 
-- **Boundaries drawn in week one are usually wrong.** Moving one here is a refactor. Moving one
-  between deployed services is a migration with a compatibility window.
-- **Every distributed-systems problem is optional right now.** No broker, no partition, no
-  serialisation format to agree, no distributed trace needed to answer "why did nothing happen".
-- **The exit is already built.** `InProcessIntegrationEventPublisher` is one class in the host.
-  Replace it with a Service Bus topic and no module changes, because none of them was ever allowed
-  to know which it was.
+Committed in that order deliberately. The first commit is the scaffold **unchanged**, so every
+later diff reads against a known-good state instead of against a copy-and-edit. The last two are
+bug fixes that the day's work exposed, kept separate from the work that exposed them.
 
 ---
 
-## Known gaps, deliberately
+## 1. One DbContext per module
 
-1. **No persistence** — all three stores are dictionaries. Picking a database before the aggregate
-   boundaries have met a real requirement means every schema decision is a migration to undo.
-2. **Publish-after-commit is two operations** — a crash between them loses the event. Day 20's
-   outbox slots into `WorkOrderService.PublishAsync` without any other file changing.
-3. **A failed handler drops its event** — no retry, no dead-letter.
-4. **The overlap check races** — two concurrent bookings can both pass it. The fix is a database
-   constraint, not more C#.
-5. **No auth, no read models, no UI** — out of scope for a design-and-scaffold day.
+The Day 28 plan called for this explicitly, and it is a **correction rather than a preference**.
+The Day 27 conversion kept one shared `AppDbContext` holding every module's entities, which meant
+every module's Infrastructure transitively saw every other module's tables. It was bounded by an
+architecture test and it was still the weakest part of that result.
+
+```
+workmanagement.WorkOrders          WorkManagementDbContext
+workmanagement.WorkOrderLabour
+workmanagement.__EFMigrationsHistory
+
+scheduling.Reservations            SchedulingDbContext
+scheduling.__EFMigrationsHistory
+
+billing.Invoices                   BillingDbContext
+billing.__EFMigrationsHistory
+```
+
+Scheduling cannot write a work order even by accident now, because the type is not reachable from
+its context. The boundary stopped being a rule people have to remember.
+
+All three point at the **same database**, separated by schema — one connection string, one backup
+story, and the split can be made physical later if a module ever needs its own server.
+
+Each module also gets its **own migrations history table**. Sharing one would make three
+independently-migratable modules share a single append-only log, so `migrations add` in one module
+would see the others' migrations as pending and try to apply them.
+
+## 2. Mapping an aggregate that was designed before any database existed
+
+None of the domain was bent to suit EF. The configuration is longer than a naive mapping and the
+domain stayed clean in exchange.
+
+| Domain decision | What the mapping had to do |
+|---|---|
+| `WorkOrderId`, `CustomerId`, `TechnicianId` are `readonly record struct` wrappers, so a customer id can never be passed where a technician id is expected | Value converters unwrap them. `ValueGeneratedNever`, because the domain creates the v7 GUID — a database-generated key would mean an aggregate is not fully formed until saved, and `Raise` would have nothing to put in the event it publishes |
+| `ServiceAddress` and `ScheduledWindow` are records with private constructors and `Result`-returning factories | `OwnsOne`, binding through the private constructor, so the factories stay the only public way to build one |
+| `Labour` is exposed only as `IReadOnlyList` and mutated only inside `LogLabour` | `OwnsMany` reached through the `_labour` backing field, so `LogLabour` remains the only way in |
+| `Status` and `Priority` are enums | Stored as **strings**. `status = 3` means nothing during an incident, and renumbering the enum silently rewrites history |
+| `Money` carries a currency because a bare decimal is not money | `OwnsOne` with `decimal(19,4)`, not EF's default `(18,2)`. Two places is enough to *store* a currency and not enough to *compute* one |
+
+**`GetBreachingSlaAsync` narrows in SQL and decides in the domain.** The database filters to rows
+that *could* have breached — a due date in the past, a non-terminal status — and
+`WorkOrder.HasBreachedSla` makes the actual call. Pushing that rule into the LINQ predicate would
+put the definition of "breached" in two places and let them drift. The SQL filter is deliberately
+looser, and must never exclude a row the domain would have accepted.
+
+## 3. Two bugs the move exposed
+
+Both were correct only because of an accident of the previous implementation. Neither was caught
+by any of the 58 tests.
+
+### A release that was never saved
+
+`WorkOrderReleasedHandler` loaded a reservation, called `Release()`, and stopped.
+
+Against a dictionary that worked: the object in the dictionary **was** the entity, so mutating it
+was instantly visible. Against EF the change sits in the change tracker and is discarded when the
+scope ends. The slot was never released, the technician stayed booked, and **nothing threw** — the
+only symptom was a later rebooking coming back refused.
+
+`IReservationRepository` now has an explicit `SaveChangesAsync`. `WorkOrderService` was audited
+for the same mistake and does not have it: every mutation goes through `MutateAsync`, which saves
+and *then* publishes.
+
+> Worth recording how this was found. Every unit test uses the dictionary fake, where the bug
+> cannot exist — **a fake that cannot reproduce a failure mode cannot warn you about it.** It took
+> driving the real thing over HTTP against a real database to see it, which is exactly what this
+> exercise asks for.
+
+### In-memory stores that lived in production code
+
+The three `InMemory*Store` classes were in the **Infrastructure** projects, and the application
+tests referenced those projects to borrow them. Deleting one broke the test build rather than
+anything real.
+
+A test double belongs to the test. They moved into the test project as fakes, and the three
+Infrastructure project references are gone from the test csproj with them.
+
+## 4. A smoke test that only passed on an empty database
+
+The script passed 8/8 on the design day, then failed three assertions on its second run today
+with nothing wrong in the code. Two causes, both artefacts of the stores having been dictionaries:
+
+- **A fixed technician GUID.** Every run booked the same technician for the same window. Once the
+  database remembered the first run, the second was correctly refused and compensated back to
+  `Triaged`. Now a fresh GUID per run.
+- **`console.log` of a number.** Node applies `util.inspect` formatting and **colours** numbers
+  when it thinks stdout is a TTY, so the invoice count arrived as `ESC[33m0ESC[39m` and
+  `[ "$COUNT" = "0" ]` was false while the value was right. Environment-dependent, which is the
+  worst kind — it passed on the machine it was written on.
+
+---
+
+## The happy path working
+
+`scripts/smoke.sh` drives the whole system over HTTP against Azure SQL. Full output in
+[`docs/smoke-output.txt`](docs/smoke-output.txt).
+
+```
+ 1. Raise a work order
+   [PASS] created
+ 2. The state machine refuses out-of-order transitions
+   [PASS] 409 Conflict, not 400 - the request was fine, the state was not
+   [PASS] cannot schedule an untriaged order
+ 3. Triage derives the SLA due date
+   [PASS] priority set, due date derived from it
+ 4. Scheduling crosses the module boundary
+   [PASS] WorkManagement -> Scheduling reserved the slot
+ 5. A clashing booking is compensated back to triage
+   [PASS] same technician, same window -> compensated back to Triaged
+ 6. Complete the first order, and Billing invoices it
+   [PASS] nothing invoiced - no order has been completed
+ 7. Cancelling releases the technician's slot
+   [PASS] the released slot was reusable - Scheduling heard the cancellation
+
+ 8 passed, 0 failed
+```
+
+Re-run twice more back to back against the same database — `8 passed, 0 failed` each time. That
+matters more than the first pass: it is the difference between working and being repeatable.
+
+### The proof that it is really a database
+
+A work order created by one run, fetched from a **process that never created it**:
+
+```json
+{
+  "id": "01a0a91e-c1ab-78db-abad-75387cf0bc8a",
+  "status": "Cancelled",
+  "summary": "Chiller unit is not holding temperature",
+  "address": "Unit 4, Example Industrial Estate, Testville TV1 9ZZ",
+  "priority": "High",
+  "dueBy": "2026-09-17T07:29:20.2991674+00:00",
+  "technicianId": "e078cce2-1863-4fb8-87ee-35f9d7aea3a3",
+  "window": { "start": "2026-09-16T08:29:20.087+00:00",
+              "end":   "2026-09-16T09:29:20.162+00:00" }
+}
+```
+
+The aggregate, its owned `window` value object and its technician id all came back from SQL. And
+the provider is not in doubt:
+
+```
+Provider name: Microsoft.EntityFrameworkCore.SqlServer
+Data source:   tcp:sql-dispatch-dev-zgdsji.database.windows.net,1433
+```
+
+### Run it yourself
+
+```bash
+cd Day29
+export ConnectionStrings__Dispatch="Server=tcp:sql-dispatch-dev-zgdsji.database.windows.net,1433;\
+Initial Catalog=dispatch;Encrypt=True;Connection Timeout=60;Authentication=Active Directory Default"
+
+dotnet test              # 58 passed
+bash scripts/smoke.sh    # 8 passed, 0 failed
+```
+
+`Active Directory Default` picks up the `az` CLI login locally and a managed identity when
+deployed. The server is Entra-only, so there is no password to configure either way.
+
+---
+
+## What is still a dictionary, and what is next
+
+Nothing. All three stores are real.
+
+Still open, in build-plan order:
+
+- **The overlap check races** (day 2). Two concurrent bookings can both pass it and both insert.
+  The fix is a database constraint, not more C# — and the reservation-failed path that handles it
+  already exists.
+- **Publish-after-commit is two operations** (day 3). A crash between them loses the event
+  silently. The transactional outbox is the fix.
+- **`ListAsync` is unbounded**, backing a demonstration endpoint. Paging belongs with the read
+  models on day 7, where the query side gets designed rather than improvised.
+- **Migrations are applied by hand.** Fine for one developer; it becomes a deployment step on
+  day 9.
