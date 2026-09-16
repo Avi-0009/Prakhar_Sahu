@@ -26,8 +26,8 @@ public static class WorkManagementModule
 {
     public static IServiceCollection AddWorkManagement(this IServiceCollection services)
     {
-        services.AddScoped<IWorkOrderRepository>(_ => Store);
-        services.AddScoped<IUnitOfWork, InMemoryUnitOfWork>();
+        services.AddScoped<IWorkOrderRepository, EfWorkOrderRepository>();
+        services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<WorkOrderService>();
 
         // The inbound half of the scheduling saga.
@@ -38,8 +38,12 @@ public static class WorkManagementModule
         return services;
     }
 
-    // A single instance behind a scoped registration, because the "database" is a dictionary and
-    // a per-request one would forget everything between calls. The moment this becomes a real
-    // store the singleton disappears and the scoped lifetime starts meaning what it says.
-    private static readonly InMemoryWorkOrderStore Store = new();
+    // The singleton is gone. That comment used to end "the moment this becomes a real store the
+    // singleton disappears and the scoped lifetime starts meaning what it says" -- and this is
+    // that moment. A scoped repository now resolves a scoped DbContext, so each request gets its
+    // own change tracker and its own transaction boundary, which is what scoped was always
+    // supposed to mean here.
+    //
+    // AddWorkManagementPersistence registers the DbContext itself. It is separate because the
+    // connection string is the host's business, not the module's.
 }

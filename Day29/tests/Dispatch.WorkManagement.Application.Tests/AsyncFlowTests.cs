@@ -1,13 +1,10 @@
 using Dispatch.Billing.Application.Invoices;
 using Dispatch.Billing.Contracts;
-using Dispatch.Billing.Infrastructure.Persistence;
 using Dispatch.Scheduling.Application.Reservations;
 using Dispatch.Scheduling.Contracts;
-using Dispatch.Scheduling.Infrastructure.Persistence;
 using Dispatch.WorkManagement.Application.WorkOrders;
 using Dispatch.WorkManagement.Contracts;
 using Dispatch.WorkManagement.Domain.WorkOrders;
-using Dispatch.WorkManagement.Infrastructure.Persistence;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Dispatch.WorkManagement.Application.Tests;
@@ -36,10 +33,10 @@ public class AsyncFlowTests
             Bus = new TestBus();
 
             WorkOrders = new WorkOrderService(
-                new InMemoryWorkOrderStore(), new InMemoryUnitOfWork(), Bus, Clock);
+                new FakeWorkOrderRepository(), new FakeUnitOfWork(), Bus, Clock);
 
-            Reservations = new InMemoryReservationStore();
-            Invoices = new InMemoryInvoiceStore();
+            Reservations = new FakeReservationRepository();
+            Invoices = new FakeInvoiceRepository();
 
             // WorkManagement -> Scheduling
             Bus.Subscribe(new WorkOrderScheduledHandler(
@@ -59,8 +56,8 @@ public class AsyncFlowTests
         public TestClock Clock { get; }
         public TestBus Bus { get; }
         public WorkOrderService WorkOrders { get; }
-        public InMemoryReservationStore Reservations { get; }
-        public InMemoryInvoiceStore Invoices { get; }
+        public IReservationRepository Reservations { get; }
+        public IInvoiceRepository Invoices { get; }
 
         public async Task<Guid> RaiseAndTriageAsync()
         {

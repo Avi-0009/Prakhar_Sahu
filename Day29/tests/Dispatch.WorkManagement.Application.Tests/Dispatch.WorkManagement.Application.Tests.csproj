@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -24,10 +24,7 @@
     <ProjectReference Include="..\..\src\Modules\WorkManagement\Dispatch.WorkManagement.Domain\Dispatch.WorkManagement.Domain.csproj" />
     <ProjectReference Include="..\..\src\Dispatch.SharedKernel\Dispatch.SharedKernel.csproj" />
     <ProjectReference Include="..\..\src\Modules\Scheduling\Dispatch.Scheduling.Application\Dispatch.Scheduling.Application.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Scheduling\Dispatch.Scheduling.Infrastructure\Dispatch.Scheduling.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Modules\Billing\Dispatch.Billing.Application\Dispatch.Billing.Application.csproj" />
-    <ProjectReference Include="..\..\src\Modules\Billing\Dispatch.Billing.Infrastructure\Dispatch.Billing.Infrastructure.csproj" />
-    <ProjectReference Include="..\..\src\Modules\WorkManagement\Dispatch.WorkManagement.Infrastructure\Dispatch.WorkManagement.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
